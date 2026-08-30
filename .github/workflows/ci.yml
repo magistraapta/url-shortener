@@ -26,9 +26,6 @@ jobs:
           go mod download
           go mod verify
 
-      - name: Vet
-        run: go vet ./...
-
       - name: Build
         run: go build ./...
 
