@@ -30,7 +30,7 @@ func main() {
 		baseURL = "http://localhost:8080"
 	}
 
-	repo := repositories.NewUrlRepository(db)
+	repo := repositories.NewURLRepository(db)
 	svc := services.NewUrlService(repo, baseURL)
 	ctrl := controller.NewUrlController(svc)
 

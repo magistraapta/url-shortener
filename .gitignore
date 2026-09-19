@@ -1,0 +1,13 @@
+# Local environment / secrets
+.env
+
+# Air live-reload
+tmp/
+build-errors.log
+
+# Build output
+/url-shortener
+/main
+
+# Editor
+.idea/

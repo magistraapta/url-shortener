@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"url-shortener/models"
 
 	"github.com/jackc/pgx/v5"
@@ -37,17 +38,17 @@ type IUrlRepository interface {
 	CreateOrGetShortCode(ctx context.Context, u models.Url) (string, error)
 }
 
-type UrlRepository struct {
+type URLRepository struct {
 	db DB
 }
 
-func NewUrlRepository(db DB) IUrlRepository {
-	return &UrlRepository{db: db}
+func NewURLRepository(db DB) IUrlRepository {
+	return &URLRepository{db: db}
 }
 
 // GetLongURL resolves a short code to its original URL for redirects.
 // It returns ErrURLNotFound if there is no such row.
-func (r *UrlRepository) GetLongURL(ctx context.Context, shortCode string) (string, error) {
+func (r *URLRepository) GetLongURL(ctx context.Context, shortCode string) (string, error) {
 	const query = `SELECT long_url FROM url WHERE short_url = $1 LIMIT 1`
 
 	var longURL string
@@ -64,7 +65,7 @@ func (r *UrlRepository) GetLongURL(ctx context.Context, shortCode string) (strin
 // CreateOrGetShortCode inserts u as a new mapping. If u.LongURLHash already
 // exists, it returns the short code stored on that existing row instead. Either
 // way the returned string is the code the caller should serve.
-func (r *UrlRepository) CreateOrGetShortCode(ctx context.Context, u models.Url) (string, error) {
+func (r *URLRepository) CreateOrGetShortCode(ctx context.Context, u models.Url) (string, error) {
 	const query = `
 		INSERT INTO url (id, long_url, long_url_hash, short_url, created_at)
 		VALUES ($1, $2, $3, $4, now())
