@@ -1,3 +1,4 @@
+// main func
 package main
 
 import (
@@ -32,7 +33,7 @@ func main() {
 
 	repo := repositories.NewURLRepository(db)
 	svc := services.NewUrlService(repo, baseURL)
-	ctrl := controller.NewUrlController(svc)
+	ctrl := controller.NewURLController(svc)
 
 	router := gin.Default()
 	router.GET("/healthz", func(c *gin.Context) { c.Status(200) })

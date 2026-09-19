@@ -32,7 +32,7 @@ func (f fakeSvc) Resolve(ctx context.Context, code string) (string, error) {
 func newRouter(svc services.IUrlService) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewUrlController(svc).RegisterRoutes(r)
+	NewURLController(svc).RegisterRoutes(r)
 	return r
 }
 
