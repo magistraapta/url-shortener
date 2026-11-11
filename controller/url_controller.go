@@ -1,67 +1,79 @@
 package controller
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 
-	"url-shortener/models"
-	"url-shortener/repositories"
+	models "url-shortener/models"
 	"url-shortener/services"
+)
 
-	"github.com/gin-gonic/gin"
+var (
+	ErrInvalidURL = errors.New("invalid url")
+	ErrURLNotFound = errors.New("short link not found")
 )
 
 type UrlController struct {
-	svc services.IUrlService
+	svc services.UrlServiceInterface
 }
 
-func NewUrlController(svc services.IUrlService) *UrlController {
+func NewUrlController(svc services.UrlServiceInterface) *UrlController {
 	return &UrlController{svc: svc}
 }
 
-// RegisterRoutes wires the controller's handlers onto r.
-func (c *UrlController) RegisterRoutes(r gin.IRouter) {
-	r.POST("/api/urls", c.Shorten)
-	r.GET("/:code", c.Redirect)
+// RegisterRoutes wires the controller's handlers onto mux.
+func (c *UrlController) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/urls", c.Shorten)
+	mux.HandleFunc("GET /{code}", c.Redirect)
 }
 
 // Shorten handles POST /api/urls with body {"long_url": "..."} and responds
 // 201 with {"long_url": "...", "short_url": "..."}.
-func (c *UrlController) Shorten(ctx *gin.Context) {
+func (c *UrlController) Shorten(w http.ResponseWriter, r *http.Request) {
 	var req models.ShortUrlRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "body must be JSON with a long_url field"})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "body must be JSON with a long_url field"})
 		return
 	}
 
-	res, err := c.svc.Shorten(ctx.Request.Context(), req.LongURL)
+	res, err := c.svc.Shorten(r.Context(), req.LongURL)
 	switch {
-	case errors.Is(err, services.ErrInvalidURL):
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid url"})
+	case errors.Is(err, ErrInvalidURL):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid url"})
 		return
 	case err != nil:
 		slog.Error("shorten failed", "err", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, res)
+	writeJSON(w, http.StatusCreated, res)
 }
 
-func (c *UrlController) Redirect(ctx *gin.Context) {
-	code := ctx.Param("code")
+// Redirect handles GET /{code} and responds 302 to the original URL.
+func (c *UrlController) Redirect(w http.ResponseWriter, r *http.Request) {
+	code := r.PathValue("code")
 
-	longURL, err := c.svc.Resolve(ctx.Request.Context(), code)
+	longURL, err := c.svc.Resolve(r.Context(), code)
 	switch {
-	case errors.Is(err, repositories.ErrURLNotFound):
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "short link not found"})
+	case errors.Is(err, ErrURLNotFound):
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "short link not found"})
 		return
 	case err != nil:
 		slog.Error("resolve failed", "err", err, "code", code)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
 
-	ctx.Redirect(http.StatusFound, longURL)
+	http.Redirect(w, r, longURL, http.StatusFound)
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		slog.Error("write response failed", "err", err)
+	}
 }

@@ -7,9 +7,6 @@ import (
 	"fmt"
 )
 
-// HashURL returns the SHA-256 digest of a long URL. It is stored in the
-// url.long_url_hash column and carries the UNIQUE constraint used for
-// deduplication, since the long_url TEXT column itself is too large to index.
 func HashURL(longURL string) []byte {
 	sum := sha256.Sum256([]byte(longURL))
 	return sum[:]
@@ -17,8 +14,6 @@ func HashURL(longURL string) []byte {
 
 const codeAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-// GenerateCode returns a random base62 string of the given length, using a
-// cryptographically secure source so codes can't be guessed or enumerated.
 func GenerateCode(length int) (string, error) {
 	if length <= 0 {
 		return "", errors.New("generate code: length must be positive")
