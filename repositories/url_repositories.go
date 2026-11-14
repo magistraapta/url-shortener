@@ -3,8 +3,11 @@ package repositories
 import (
 	"context"
 	models "url-shortener/models"
+	"url-shortener/util"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UrlRepositoryInterface interface {
@@ -22,10 +25,21 @@ func NewUrlRepository(db *gorm.DB) *UrlRepository {
 
 func (r *UrlRepository) SaveUrl(ctx context.Context, longURL string, shortCode string) error {
 	url := models.Url{
-		LongURL:  longURL,
-		ShortURL: shortCode,
+		ID:          uuid.New(),
+		LongURL:     longURL,
+		LongURLHash: util.HashURL(longURL),
+		ShortURL:    shortCode,
 	}
-	return r.db.WithContext(ctx).Create(&url).Error
+	// The same long URL is already stored: nothing to do. The short code is
+	// derived deterministically from the URL, so the existing row has the same
+	// code. A short_url collision between *different* URLs is not covered by
+	// this target and still surfaces as an error.
+	return r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "long_url_hash"}},
+			DoNothing: true,
+		}).
+		Create(&url).Error
 }
 
 func (r *UrlRepository) GetLongURL(ctx context.Context, shortCode string) (string, error) {

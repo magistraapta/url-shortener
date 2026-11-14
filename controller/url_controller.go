@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	ErrInvalidURL = errors.New("invalid url")
 	ErrURLNotFound = errors.New("short link not found")
 )
 
@@ -34,22 +33,22 @@ func (c *UrlController) RegisterRoutes(mux *http.ServeMux) {
 func (c *UrlController) Shorten(w http.ResponseWriter, r *http.Request) {
 	var req models.ShortUrlRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "body must be JSON with a long_url field"})
+		writeError(w, http.StatusBadRequest, "invalid_request", "body must be JSON with a long_url field")
 		return
 	}
 
 	res, err := c.svc.Shorten(r.Context(), req.LongURL)
 	switch {
-	case errors.Is(err, ErrInvalidURL):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid url"})
+	case errors.Is(err, services.ErrInvalidURL):
+		writeError(w, http.StatusBadRequest, "invalid_url", "invalid url")
 		return
 	case err != nil:
 		slog.Error("shorten failed", "err", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+		writeError(w, http.StatusInternalServerError, "internal_error", "internal error")
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, res)
+	writeSuccess(w, http.StatusCreated, res)
 }
 
 // Redirect handles GET /{code} and responds 302 to the original URL.
@@ -59,15 +58,23 @@ func (c *UrlController) Redirect(w http.ResponseWriter, r *http.Request) {
 	longURL, err := c.svc.Resolve(r.Context(), code)
 	switch {
 	case errors.Is(err, ErrURLNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "short link not found"})
+		writeError(w, http.StatusNotFound, "not_found", "short link not found")
 		return
 	case err != nil:
 		slog.Error("resolve failed", "err", err, "code", code)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+		writeError(w, http.StatusInternalServerError, "internal_error", "internal error")
 		return
 	}
 
 	http.Redirect(w, r, longURL, http.StatusFound)
+}
+
+func writeSuccess[T any](w http.ResponseWriter, status int, data T) {
+	writeJSON(w, status, models.Success(data))
+}
+
+func writeError(w http.ResponseWriter, status int, code, message string) {
+	writeJSON(w, status, models.Failure(code, message))
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

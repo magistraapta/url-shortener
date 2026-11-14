@@ -9,9 +9,14 @@ import (
 	"url-shortener/database"
 	"url-shortener/repositories"
 	"url-shortener/services"
+	"encoding/json"
 
 	"github.com/joho/godotenv"
 )
+type Response struct {
+	Message string
+	Status int
+}
 
 func main() {
 
@@ -25,7 +30,6 @@ func main() {
 	}
 	db := database.DB
 
-
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
 		baseURL = "http://localhost:8080"
@@ -36,7 +40,18 @@ func main() {
 	ctrl := controller.NewUrlController(svc)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+
+		response := &Response {
+			Message: "OK",
+			Status: http.StatusOK,
+		}
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+		}
+	})
 	ctrl.RegisterRoutes(mux)
 
 	if err := http.ListenAndServe(":8080", mux); err != nil {
